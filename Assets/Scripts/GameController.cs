@@ -2,16 +2,23 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.SceneManagement;
 using TMPro;
+using UnityEngine.Windows.Speech;
 using Random = UnityEngine.Random;
 using Vector3 = UnityEngine.Vector3;
 using Quaternion = UnityEngine.Quaternion;
 using Mode = Helper.Mode;
 
 public class GameController : MonoBehaviour {
+    // MULTIMODAL INTEGRATION // 
+    private KeywordRecognizer keywordRecognizer;
+    private Dictionary<string, Action> actions = new Dictionary<string, System.Action>();
+
+    // MULTIMODAL INTEGRATION // 
     private readonly string STAGES_PATH = "Assets/Stages/";
     private readonly int[] scores = { 0, 40, 100, 300, 1200 };
     private readonly int NUM_OF_STAGES = 20;
@@ -50,9 +57,28 @@ public class GameController : MonoBehaviour {
     public Text timeValue, levelValue, linesValue, stageValue, scoreValue, gameModeValue;
 
     void Start() {
+        // MULTIMODAL INTEGRATION //
+
+        actions.Add("right", HorizontalMoveRight);
+        actions.Add("left", HorizontalMoveLeft);
+        actions.Add("down", VerticalMoveDown);
+        actions.Add("rotate", Rotate);
+        actions.Add("spam", NewBlock);
+
+        
+        keywordRecognizer = new KeywordRecognizer(actions.Keys.ToArray());
+        keywordRecognizer.OnPhraseRecognized += RecognizedSpeech;
+        keywordRecognizer.Start();
+
+        // // MULTIMODAL INTEGRATION // 
         muteButton.SetActive(true);
         speakerButton.SetActive(false);
         InitGame();
+    }
+
+    void RecognizedSpeech(PhraseRecognizedEventArgs speech){
+        Debug.Log(speech.text);
+        actions[speech.text].Invoke();
     }
 
     void InitGame() {
@@ -201,6 +227,29 @@ public class GameController : MonoBehaviour {
         }
     }
 
+    void HorizontalMoveRight() {
+        currBlock.transform.position += Vector3.right;
+        if (!ValidMove(currBlock.transform)) {
+            currBlock.transform.position -= Vector3.right;
+        }
+    }
+
+    void HorizontalMoveLeft() {
+        currBlock.transform.position += Vector3.left;
+        if (!ValidMove(currBlock.transform)) {
+            currBlock.transform.position -= Vector3.left;
+        }
+    }
+
+    void VerticalMoveDown() {
+        currBlock.transform.position += Vector3.down;
+        if (!ValidMove(currBlock.transform)) {
+            currBlock.transform.position -= Vector3.down;
+            CreateDeadBlock();
+            DestroyCurrBlock();
+            CheckForLines();
+        }
+    }
     void HorizontalMove(Vector3 nextMove) {
         currBlock.transform.position += nextMove;
         if (!ValidMove(currBlock.transform)) {
